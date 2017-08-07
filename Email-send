@@ -1,0 +1,60 @@
+import smtplib
+def sendMail(sender,receivers,subject):
+    # #pre-appoint smtp server
+    # smtpserver="smtp.sina.com"
+    # username="18317156095@sina.com"
+    # #you may need to use "授权码" for the smtp server
+    # password="*********"
+
+    smtpserver = "mail.cisco.com"
+    username = "sish@cisco.com"
+    # you may need to use "授权码" for the smtp server
+    password = "**********"
+
+
+    #create a SMTP class object using pre-appoint parameter
+    smtp=smtplib.SMTP()
+
+    #connect smtp server
+    try:
+        smtp.connect(smtpserver)
+    except Exception as e:
+        print(str(e))
+    else:
+        print("connect succeed")
+
+    smtp.ehlo()
+    smtp.starttls()
+    
+    #login server using usename and password 
+    try:
+        smtp.login(username, password)
+    except Exception as e:
+        print(str(e))
+    else:
+        print("login succeed")
+
+    #send e-mail 
+    try:
+        smtp.sendmail(sender, receivers, subject)
+    except Exception as e:
+        print(str(e))
+    else:
+        print("send succeed")
+
+    #disconnect the connection
+    smtp.quit()
+
+
+if __name__ == '__MAIN__':
+    # sender="18317156095@sina.com"
+    sender="sish@cisco.com"
+    recivers='852282605@qq.com'
+    subject="hello"
+    try:
+        sendMail(sender, recivers, subject)
+        print("succeed")
+    except Exception as e:
+        print(str(e))
+
+    print("finish")
