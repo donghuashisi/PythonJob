@@ -1,0 +1,23 @@
+#install cassandra-driver packet firs and then import the model
+from cassandra.cluster import Cluster
+
+
+#running the cassandra on local mode,default port is 9042
+cluster=Cluster(['127.0.0.1'],port=9042)
+session=cluster.connect()
+
+session.execute("use mykeyspace")
+session.execute("create table users(id int, name text, primary key(id));")
+session.execute("insert into users(id, name) values(1, 'shisi');")
+session.execute("insert into users(id, name) values(2, 'Zhang zhipeng');")
+
+session=cluster.connect(keyspace="mykeyspace")
+res=session.execute("select * from users;")
+for row in res:
+    print("id:"+str(row.id)+"  name:"+str(row.name))
+
+print(cluster.is_shutdown)
+#close the cluster
+cluster.shutdown()
+print(cluster.is_shutdown)
+session.execute("select * from users;")  #cassandra.cluster.: ('Unable to complete the operation against any hosts', {: ConnectionException('Pool is shutdown' ,)})
