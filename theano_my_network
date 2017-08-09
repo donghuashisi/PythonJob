@@ -1,0 +1,363 @@
+import numpy as np
+import theano.tensor as T
+from theano import function
+import theano
+import matplotlib.pyplot as plt
+rng = np.random
+
+####   SECTION 1 : basic useage     ###
+# x=T.dscalar('x')
+# y=T.dscalar('y')
+# z=x+y
+# f=function([x,y],z)
+# print (f(2,1))
+#
+# #how about matrix
+# x=T.dmatrix('x')
+# y=T.dmatrix('y')
+# z=x+y
+# f=function([x,y],z)
+# #input parameter 3 rows  4 column
+# print (
+#     f(np.arange(12).reshape(3,4),
+#       10*np.ones(shape=(3,4))
+#     )
+# )
+#
+
+
+#shared value
+# #set_value()  and get_value()
+# state=theano.shared(value=np.array(0,dtype=np.float64),name='state')
+# inc=T.scalar(name='inc',dtype=state.dtype)
+# accumulator=function([inc],state,updates=[(state,state+inc)])
+# accumulator(10)
+# print(state.get_value())
+# state.set_value(0)
+# print(state.get_value
+
+#activation function
+
+
+
+####   SECTION 2 : logical regression     ###
+#define a Lay Class
+"""
+to define the layer like this:
+l1=Layer(inputs,in_size=1,out_size=10,activation_function=xxx)
+l2=Layer(l1.output,in_size=10,out_size=1,activation_function=None)
+"""
+class Layer(object):
+    #matrix form
+    """
+     input:[x1,x2..........xn]   n=in_size
+
+     W:[w11,w12............w1m]  m=out_size
+       [w21................w2m]
+          ............
+       [wn1.................wnm]
+
+    b: [b1,b2.........bm]
+    """
+    def __init__(self,input,in_size,out_size,activation_function=None):
+        #in_size rows  out_size columns
+        self.out_size=out_size
+        self.W=theano.shared(np.random.normal(0,1,(in_size,out_size)))
+        self.b=theano.shared(np.zeros((out_size,))+0.1)   #pay a attention to the np.zeros
+        self.Wx_plus_b=T.dot(input,self.W)+self.b    #did it need to change or modify
+        self.activation_function=activation_function
+        if activation_function is None:
+            self.output=self.Wx_plus_b
+        else:
+            self.output=self.activation_function(self.Wx_plus_b)
+
+
+class Neurons_Network_Struct(object):
+    def __init__(self,input_feats,out_result_num,x_data,y_data,Neuronlevel,Neurons_Num_list,level_actfun_list,learning_rate,train_numbers,target_accuracy):
+        self.Layer_first_inSize = input_feats
+        self.Layer_last_outSize = out_result_num
+        self.Neuronlevel=Neuronlevel
+        self.x_data=x_data
+        self.y_data=y_data
+        self.learning_rate=learning_rate
+        self.train_numbers=train_numbers
+        self.target_accuracy=target_accuracy
+        self. LayerList = []
+
+        # if Neurons_Num_list[self.Neuronlevel-1] != self.Layer_last_outSize:
+        #     print ("input error")
+        #
+        # if Neurons_Num_list.len != Neuronlevel:
+        #     print ("input error")
+        self.Neurons_Num_list=Neurons_Num_list
+
+        # if level_actfun_list.len != Neuronlevel:
+        #     print ("input error")
+
+        self.level_actfun_list=level_actfun_list
+
+    def NetWrok_Train(self):
+        self.x = T.dmatrix('x')  # 64 bit
+        self.y = T.dmatrix('y')  # 64 bit
+        # add layers
+        # Layer_first_inSize = feats
+        # Layer_last_outSize = resultNum
+        # Neuronlevel = level
+        for i in range(self.Neuronlevel):
+            if self.Neuronlevel == 1:
+                self.LayerList.append(Layer(input=self.x, in_size=self.Layer_first_inSize, out_size=self.Layer_last_outSize,
+                                       activation_function=self.level_actfun_list[i]))
+            else:
+                if i == 0:
+                    self.LayerList.append(Layer(input=self.x, in_size=self.Layer_first_inSize, out_size=self.Neurons_Num_list[i], activation_function=self.level_actfun_list[i]))
+                else:
+                    if i == self.Neuronlevel - 1:
+                        self.LayerList.append(Layer(input=self.LayerList[i-1].output, in_size=self.LayerList[i-1].out_size,
+                                               out_size=self.Layer_last_outSize, activation_function=self.level_actfun_list[i]))
+                    else:
+                        self.LayerList.append(
+                            Layer(input=self.LayerList[i-1].output, in_size=self.LayerList[i-1].out_size, out_size=self.Neurons_Num_list[i],
+                                  activation_function=self.level_actfun_list[i]))
+
+        # l1=Layer(input=x,in_size=feats,out_size=10,activation_function=T.nnet.relu)
+        # l2=Layer(input=l1.output,in_size=10,out_size=resultNum)
+        # compute the cost
+        cost = T.mean(T.square(self.LayerList[self.Neuronlevel - 1].output - self.y))
+        # compute the gradients
+        wrt_list = []
+
+        for i in range(self.Neuronlevel):
+            wrt_list.append(self.LayerList[i].W)
+            wrt_list.append(self.LayerList[i].b)
+
+        gW_gb_list = T.grad(cost=cost, wrt=wrt_list)
+
+        # apply gradient descent
+        appy_learning_rate = self.learning_rate
+        update_list = []
+        for i in range(self.Neuronlevel):
+            update_list.append((self.LayerList[i].W, self.LayerList[i].W - appy_learning_rate * gW_gb_list[2 * i]))
+            update_list.append((self.LayerList[i].b, self.LayerList[i].b - appy_learning_rate * gW_gb_list[2 * i + 1]))
+
+        train = function(inputs=[self.x, self.y], outputs=cost, updates=update_list)
+        ############ train ##################################
+        # plot the date
+        # fig=plt.figure()
+        # ax=fig.add_subplot(1,1,1)
+        # ax.scatter(x_data,y_data)
+        # plt.ion()
+        # plt.show()
+
+        for i in range(self.train_numbers):
+            # train
+            err = train(self.x_data, self.y_data)
+            if err < self.target_accuracy:
+                break
+            if i % 10 == 0:
+            #     # to visualize the result and improvement
+            #     # predicted_value=predict(x_data)
+            #     # lines=ax.plot(x_data,predicted_value,'r-')
+            #     # plt.pause(1)
+            #     # ax.lines.remove(lines[0])
+                  print (err)
+
+
+    def NetWork_Prediction(self,input_x):
+        predict = theano.function(inputs=[self.x], outputs=[self.LayerList[self.Neuronlevel - 1].output])
+        predicted=predict(input_x)
+        return  predicted
+
+    def Network_Para_Show(self):
+        for i in range(self.Neuronlevel):
+            print "Layer",i+1,"W:",self.LayerList[i].W.get_value()
+            print "Layer",i+1,"b:", self.LayerList[i].b.get_value()
+
+    def Network_Para_Set(self,ParaList):
+        for i in range(self.Neuronlevel):
+            pass
+
+
+
+
+N=10
+feats=3
+resultNum=2
+#x_data=np.linspace(start=-1,stop=1,num=N)[:,np.newaxis]
+x_data=rng.randn(N, feats)
+#noise=np.random.normal(0,0.05,x_data.shape)
+#y_data=np.square(x_data)+noise
+y_data=rng.randn(N,resultNum)
+        # # print (x_data)
+        # # print (y_data)
+        #
+MyNetWork=Neurons_Network_Struct(input_feats=feats,out_result_num=resultNum,x_data=x_data,y_data=y_data,Neuronlevel=2,Neurons_Num_list=[2,1],level_actfun_list=[T.nnet.relu,None],learning_rate=0.05,train_numbers=50,target_accuracy=0.007)
+MyNetWork.NetWrok_Train()
+predicted=MyNetWork.NetWork_Prediction(x_data)
+print predicted
+
+
+
+# ########################  make up fake data  #######################
+# N=10  #number of samples
+#
+# #input data and result data form
+# feats=5   #dimension of input parameter
+# resultNum=1
+#
+# #define Neuron level and parameter
+# level=1
+#
+# #x_data=np.linspace(start=-1,stop=1,num=N)[:,np.newaxis]
+# x_data=rng.randn(N, feats)
+# #noise=np.random.normal(0,0.05,x_data.shape)
+# #y_data=np.square(x_data)+noise
+# y_data=rng.randn(N,resultNum)
+# # print (x_data)
+# # print (y_data)
+#
+# #show the fake data
+# # plt.scatter(x_data,y_data)
+# # plt.show()
+#
+# #############  define struct ########################3
+# #define input dtype
+# x=T.dmatrix('x')   #64 bit
+# y=T.dmatrix('y')   #64 bit
+#
+# #add layers
+# Layer_first_inSize=feats
+# Layer_last_outSize=resultNum
+# Neuronlevel=level
+# LayerList=[]
+# Neurons_Num_list=[]
+#
+# for i in range(Neuronlevel):
+#     if Neuronlevel==1:
+#         LayerList.append(Layer(input=x, in_size=Layer_first_inSize, out_size=Layer_last_outSize, activation_function=T.nnet.relu))
+#     else:
+#         if i==0:
+#             LayerList.append(Layer(input=x,in_size=Layer_first_inSize,out_size=10,activation_function=T.nnet.relu))
+#         else:
+#             if i==Neuronlevel-1:
+#                 LayerList.append(Layer(input=LayerList[i-1].output, in_size=LayerList[i-1].out_size, out_size=Layer_last_outSize, activation_function=T.nnet.relu))
+#             else:
+#                 LayerList.append(Layer(input=LayerList[i-1].output, in_size=LayerList[i-1].out_size, out_size=10, activation_function=T.nnet.relu))
+#
+#
+# # l1=Layer(input=x,in_size=feats,out_size=10,activation_function=T.nnet.relu)
+# # l2=Layer(input=l1.output,in_size=10,out_size=resultNum)
+#
+# #compute the cost
+# cost=T.mean(T.square(LayerList[Neuronlevel-1].output-y))
+#
+# #compute the gradients
+# wrt_list=[]
+# for i in range(Neuronlevel):
+#     wrt_list.append(LayerList[i].W)
+#     wrt_list.append(LayerList[i].b)
+#
+# gW_gb_list=T.grad(cost=cost,wrt=wrt_list)
+#
+# #apply gradient descent
+# learning_rate=0.05
+# update_list=[]
+# for i in range(Neuronlevel):
+#     update_list.append((LayerList[i].W,LayerList[i].W-learning_rate*gW_gb_list[2*i]))
+#     update_list.append((LayerList[i].b,LayerList[i].b - learning_rate * gW_gb_list[2*i+1]))
+#
+# train=function(inputs=[x,y],outputs=cost,updates=update_list)
+# #prediction
+# predict=function(inputs=[x],outputs=LayerList[Neuronlevel-1].output)
+#
+#
+# ############ train ##################################
+# #plot the date
+# # fig=plt.figure()
+# # ax=fig.add_subplot(1,1,1)
+# # ax.scatter(x_data,y_data)
+# # plt.ion()
+# # plt.show()
+#
+# for i in range(1000):
+#     #train
+#     err=train(x_data,y_data)
+#     if i%10 ==0:
+#         # to visualize the result and improvement
+#         # predicted_value=predict(x_data)
+#         # lines=ax.plot(x_data,predicted_value,'r-')
+#         # plt.pause(1)
+#         # ax.lines.remove(lines[0])
+#         print (err)
+#
+#
+#
+#
+#
+# # ####   SECTION 3 : classification     ###
+# #
+# # def compute_accuracy(y_target,y_predict):
+# #     print (y_predict)
+# #     correct_prediction=np.equal(y_predict,y_target)
+# #     accuracy=np.sum(correct_prediction)/len(correct_prediction)
+# #     return  accuracy
+# #
+# #
+# # class Layer(object):
+# #     def __init__(self,input,in_size,out_size,activation_function=None):
+# #         #in_size rows  out_size columns
+# #         self.W=theano.shared(np.random.normal(0,1,(in_size,out_size)))
+# #         self.b=theano.shared(np.zeros((out_size,))+0.1)
+# #         self.Wx_plus_b=T.nnet.sigmoid(T.dot(input,self.W)+self.b)
+# #         self.activation_function=activation_function
+# #         if activation_function is None:
+# #             self.output=self.Wx_plus_b
+# #         else:
+# #             self.output=self.activation_function(self.Wx_plus_b)
+# #
+# # N=400     #training sample size
+# # feats=121  #number of  input variables
+# # #generate  a dataset:D=(input_values,target_class)
+# # D=(rng.randn(N,feats),rng.randint(size=N,low=0,high=2))
+# #
+# # #Declare Theano symbolic variable
+# # x=T.dmatrix('x')
+# # y=T.vector('y')
+# #
+# # l1=Layer(input=x,in_size=feats,out_size=1,activation_function=None)
+# #
+# # #initial the weights and biases
+# #
+# #
+# # # W=theano.shared(rng.randn(feats),name='w')
+# # # b=theano.shared(0.1,name="b")
+# #
+# # #Construct Theano expression graph
+# # # p_1=T.nnet.sigmoid(T.dot(x,W)+b)
+# #
+# # prediction=l1.output>0.5
+# #
+# # xnet=-y*T.log(l1.output)-(1-y)*T.log(1-l1.output)
+# # cost=xnet.mean()+0.01*(l1.W*2).sum()     #overfiding
+# # gW,gb=T.grad(cost,[l1.W,l1.b])
+# #
+# # #Compile
+# # learning_rate=0.01
+# # train=theano.function(inputs=[x,y],
+# #                       outputs=[prediction,xnet.mean()],
+# #                       updates=[(l1.W,l1.W-learning_rate*gW),(l1.b,l1.b-learning_rate*gb)]
+# #                       )
+# #
+# # predict=theano.function(inputs=[x],outputs=prediction)
+# #
+# # for i in range(5000):
+# #     pre,err=train(D[0],D[1])
+# #     if i%50 == 0:
+# #         print ("cost:",err)
+# #         print ("accuracy:",compute_accuracy(D[1],predict(D[0])))
+# #
+# # print (D[1])
+# # print (predict(D[0]))
+#
+#
+
+
