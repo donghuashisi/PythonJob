@@ -1,0 +1,109 @@
+import numpy as np
+import theano.tensor as T
+from theano import function
+import  theano
+import matplotlib.pyplot as plt
+from sklearn.datasets import load_boston
+rng = np.random
+import  pickle
+
+
+############## Regularization ##############
+class Layer(object):
+    #matrix form
+    """
+     input:[x1,x2..........xn]   n=in_size
+
+     W:[w11,w12............w1m]  m=out_size
+       [w21................w2m]
+          ............
+       [wn1.................wnm]
+
+    b: [b1,b2.........bm]
+    """
+    def __init__(self,input,in_size,out_size,activation_function=None):
+        #in_size rows  out_size columns
+        self.out_size=out_size
+        self.W=theano.shared(np.random.normal(0,1,(in_size,out_size)))
+        self.b=theano.shared(np.zeros((out_size,))+0.1)   #pay a attention to the np.zeros
+        self.Wx_plus_b=T.dot(input,self.W)+self.b    #did it need to change or modify
+        self.activation_function=activation_function
+        if activation_function is None:
+            self.output=self.Wx_plus_b
+        else:
+            self.output=self.activation_function(self.Wx_plus_b)
+
+
+#### data point is divided into two part: training data and test data
+
+def minmax_normalization(data):
+    xs_max=np.max(data,axis=0)
+    xs_min=np.min(data,axis=0)
+    xs=(1-0)*(data-xs_min)/(xs_max-xs_min)+0
+    return xs
+
+
+np.random.seed(100)
+x_data=load_boston().data
+x_data=minmax_normalization(x_data)
+y_data=load_boston().target[:,np.newaxis]
+
+x_train,y_train=x_data[:400],y_data[:400]
+x_test,y_test=x_data[400:],y_data[400:]
+
+
+
+x=T.dmatrix('x')
+y=T.dmatrix('y')
+l1=Layer(x,13,10,T.tanh)
+l2=Layer(l1.output,l1.out_size,1,None)
+
+#the way to compute cost
+abs_cost=T.mean(T.square(l2.output-y))
+#cost=T.mean(T.square(l2.output-y))
+cost=T.mean(T.square(l2.output-y))+0.1*((l1.W**2).sum()+(l2.W**2).sum())   #l2
+#cost=T.mean(T.square(l2.output-y))+0.1*(abs(l1.W).sum()+abs(l2.W).sum())   #l1
+
+learning_rate=0.01
+gW1,gb1,gW2,gb2=T.grad(cost=cost,wrt=[l1.W,l1.b,l2.W,l2.b])
+
+train=theano.function(inputs=[x,y],outputs=[cost],updates=[
+    (l1.W,l1.W-learning_rate*gW1),
+    (l1.b,l1.b-learning_rate*gb1),
+    (l2.W,l2.W-learning_rate*gW2),
+    (l2.b,l2.b-learning_rate*gb2)
+])
+
+
+compute_cost=theano.function(inputs=[x,y],outputs=[abs_cost])
+
+
+train_err_list=[]
+test_err_list=[]
+learning_time=[]
+
+for i in range(10):
+    train(x_train,y_train)
+    if i%10 ==0:
+        train_err_list.append(compute_cost(x_train,y_train))
+        test_err_list.append(compute_cost(x_test,y_test))
+        learning_time.append(i)
+        print i
+
+# plt.plot(learning_time,train_err_list,'r-')
+# plt.plot(learning_time,test_err_list,'b--')
+# plt.show()
+
+
+### save model##
+# with open('./save/model.pickle','wb') as file:
+#     module=[l1.W.get_value(),l1.b.get_value()]
+#     pickle.dump(module,file)
+
+#load model
+with open('./save/model.pickle','rb') as file:
+    module=pickle.load(file)
+    l1.W.set_value(module[0])
+    l1.b.set_value(module[1])
+
+
