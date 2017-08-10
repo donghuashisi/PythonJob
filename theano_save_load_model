@@ -1,14 +1,57 @@
 import numpy as np
 import theano.tensor as T
 from theano import function
-import  theano
+import theano
 import matplotlib.pyplot as plt
 from sklearn.datasets import load_boston
-rng = np.random
 import  pickle
+rng = np.random
+
+####   SECTION 1 : basic useage     ###
+# x=T.dscalar('x')
+# y=T.dscalar('y')
+# z=x+y
+# f=function([x,y],z)
+# print (f(2,1))
+#
+# #how about matrix
+# x=T.dmatrix('x')
+# y=T.dmatrix('y')
+# z=x+y
+# f=function([x,y],z)
+# #input parameter 3 rows  4 column
+# print (
+#     f(np.arange(12).reshape(3,4),
+#       10*np.ones(shape=(3,4))
+#     )
+# )
+#
+
+#shared value
+# #set_value()  and get_value()
+# state=theano.shared(value=np.array(0,dtype=np.float64),name='state')
+# inc=T.scalar(name='inc',dtype=state.dtype)
+# accumulator=function([inc],state,updates=[(state,state+inc)])
+# accumulator(10)
+# print(state.get_value())
+# state.set_value(0)
+# print(state.get_value
 
 
-############## Regularization ##############
+##########################   SECTION 2 : logical regression     ###################################
+
+"""
+to define the layer like this:
+l1=Layer(inputs,in_size=1,out_size=10,activation_function=xxx)
+l2=Layer(l1.output,in_size=10,out_size=1,activation_function=None)
+"""
+def minmax_normalization(data):
+    xs_max=np.max(data,axis=0)
+    xs_min=np.min(data,axis=0)
+    xs=(1-0)*(data-xs_min)/(xs_max-xs_min)+0
+    return xs
+
+#define a Lay Class
 class Layer(object):
     #matrix form
     """
@@ -33,77 +76,279 @@ class Layer(object):
         else:
             self.output=self.activation_function(self.Wx_plus_b)
 
+class Neurons_Network_Struct(object):
+    def __init__(self,input_feats,out_result_num,x_data,y_data,Neuronlevel,Neurons_Num_list,level_actfun_list,learning_rate,train_numbers,target_accuracy):
+        self.Layer_first_inSize = input_feats
+        self.Layer_last_outSize = out_result_num
+        self.Neuronlevel=Neuronlevel
+        self.x_data=x_data
+        self.y_data=y_data
+        self.learning_rate=learning_rate
+        self.train_numbers=train_numbers
+        self.target_accuracy=target_accuracy
+        self.LayerList = []
+        self.predict=None
+        self.x = T.dmatrix('x')  # 64 bit
+        self.y = T.dmatrix('y')  # 64 bit
+        self.Neurons_Num_list=Neurons_Num_list
+        self.level_actfun_list=level_actfun_list
 
-#### data point is divided into two part: training data and test data
+    def NetWrok_Train(self):
+        ## build the neural network strucure  with the user definition
 
-def minmax_normalization(data):
-    xs_max=np.max(data,axis=0)
-    xs_min=np.min(data,axis=0)
-    xs=(1-0)*(data-xs_min)/(xs_max-xs_min)+0
-    return xs
+        ## add Layer class into network
+        for i in range(self.Neuronlevel):
+            if self.Neuronlevel == 1:
+                self.LayerList.append(Layer(input=self.x, in_size=self.Layer_first_inSize, out_size=self.Layer_last_outSize,
+                                       activation_function=self.level_actfun_list[i]))
+            else:
+                if i == 0:
+                    self.LayerList.append(Layer(input=self.x, in_size=self.Layer_first_inSize, out_size=self.Neurons_Num_list[i], activation_function=self.level_actfun_list[i]))
+                else:
+                    if i == self.Neuronlevel - 1:
+                        self.LayerList.append(Layer(input=self.LayerList[i-1].output, in_size=self.LayerList[i-1].out_size,
+                                               out_size=self.Layer_last_outSize, activation_function=self.level_actfun_list[i]))
+                    else:
+                        self.LayerList.append(
+                            Layer(input=self.LayerList[i-1].output, in_size=self.LayerList[i-1].out_size, out_size=self.Neurons_Num_list[i],
+                                  activation_function=self.level_actfun_list[i]))
+
+        ########## define the cost  #################################
+
+        ####  normal cost compute methond with overfitting problem
+        #cost = T.mean(T.square(self.LayerList[self.Neuronlevel - 1].output - self.y))
+
+        ##  pay attention to the defination of cost function
+        ####  l2 cost compute form: deal with overfitting problem
+        Layer_W_Cost = 0
+        for i in range(self.Neuronlevel):
+            Layer_W_Cost += (self.LayerList[i].W**2).sum()
+        cost = T.mean(T.square(self.LayerList[self.Neuronlevel - 1].output - self.y)) + 0.1 *Layer_W_Cost # l2
+
+        """
+        ####  l1 cost compute form: deal with overfitting problem 
+        Layer_W_Cost = 0
+        for i in range(self.Neuronlevel):
+            Layer_W_Cost += (abs(self.LayerList[i].W)).sum()
+            
+        cost = T.mean(T.square(self.LayerList[self.Neuronlevel - 1].output - self.y)) + 0.1 * Layer_W_Cost  # l1
+        # cost=T.mean(T.square(l2.output-y))+0.1*(abs(l1.W).sum()+abs(l2.W).sum())   #l1
+       """
+        ##################  define the gradients #############################
+        wrt_list = []
+
+        for i in range(self.Neuronlevel):
+            wrt_list.append(self.LayerList[i].W)
+            wrt_list.append(self.LayerList[i].b)
+
+        gW_gb_list = T.grad(cost=cost, wrt=wrt_list)
+
+        # apply gradient descent
+        appy_learning_rate = self.learning_rate
+        update_list = []
+        for i in range(self.Neuronlevel):
+            update_list.append((self.LayerList[i].W, self.LayerList[i].W - appy_learning_rate * gW_gb_list[2 * i]))
+            update_list.append((self.LayerList[i].b, self.LayerList[i].b - appy_learning_rate * gW_gb_list[2 * i + 1]))
+
+        ## define train function
+        train = function(inputs=[self.x, self.y], outputs=cost, updates=update_list)
+
+        ######################## train the model  ####################################
+        for i in range(self.train_numbers):
+            err = train(self.x_data, self.y_data)
+            if err < self.target_accuracy:
+                break
+            if i % 10 == 0:
+            #     # to visualize the result and improvement
+                  print (err)
+
+    def NetWork_Prediction(self,input_x):
+        ## define predict function
+        ## input x and  return the predicted y
+        self.predict = theano.function(inputs=[self.x], outputs=[self.LayerList[self.Neuronlevel - 1].output])
+        predicted=self.predict(input_x)
+        return  predicted
+
+    def NetWork_Model_test(self,input_x,input_y):
+        ## when the model finishes train, use test data to test the model
+        ## input test data and return the accuracy the model
+        test_cost = T.mean(T.square(self.LayerList[self.Neuronlevel - 1].output - self.y))
+        Accuracy_ComputFun= theano.function(inputs=[self.x,self.y], outputs=[test_cost])
+        return Accuracy_ComputFun(input_x,input_y)
 
 
-np.random.seed(100)
-x_data=load_boston().data
-x_data=minmax_normalization(x_data)
-y_data=load_boston().target[:,np.newaxis]
-
-x_train,y_train=x_data[:400],y_data[:400]
-x_test,y_test=x_data[400:],y_data[400:]
-
-
-
-x=T.dmatrix('x')
-y=T.dmatrix('y')
-l1=Layer(x,13,10,T.tanh)
-l2=Layer(l1.output,l1.out_size,1,None)
-
-#the way to compute cost
-abs_cost=T.mean(T.square(l2.output-y))
-#cost=T.mean(T.square(l2.output-y))
-cost=T.mean(T.square(l2.output-y))+0.1*((l1.W**2).sum()+(l2.W**2).sum())   #l2
-#cost=T.mean(T.square(l2.output-y))+0.1*(abs(l1.W).sum()+abs(l2.W).sum())   #l1
-
-learning_rate=0.01
-gW1,gb1,gW2,gb2=T.grad(cost=cost,wrt=[l1.W,l1.b,l2.W,l2.b])
-
-train=theano.function(inputs=[x,y],outputs=[cost],updates=[
-    (l1.W,l1.W-learning_rate*gW1),
-    (l1.b,l1.b-learning_rate*gb1),
-    (l2.W,l2.W-learning_rate*gW2),
-    (l2.b,l2.b-learning_rate*gb2)
-])
+    def Network_Model_Save(self):
+        ##when the model finishes train,save the parameters to a file
+        ### save model##
+        model_list=[]
+        with open('./model.pickle','wb') as file:
+            for i in range(self.Neuronlevel):
+                model_list.append(self.LayerList[i].W.get_value())
+                model_list.append(self.LayerList[i].b.get_value())
+            pickle.dump(model_list,file)
 
 
-compute_cost=theano.function(inputs=[x,y],outputs=[abs_cost])
+    def Network_Model_Reload(self):
+        ## rebuild the model with the parametes saved
+        # load model
+        with open('./model.pickle', 'rb') as file:
+            model_list = pickle.load(file)
+            # print(model_list)
+            # print(model_list[0])
+            # print(model_list[1])
+            # self.LayerList[0].W.set_value(model_list[0])
+            # self.LayerList[0].b.set_value(model_list[1])
+            for i in range(self.Neuronlevel):
+                self.LayerList[i].W.set_value(model_list[i])
+                self.LayerList[i].b.set_value(model_list[2*i+1])
+
+    def Data_MinMax_Normalization(self):
+        ## input data zero homogenization and normalization
+        xs_max=np.max(self.x_data,axis=0)
+        xs_min=np.min(self.x_data,axis=0)
+        self.x_data=(1-0)*(self.x_data-xs_min)/(xs_max-xs_min)+0
 
 
-train_err_list=[]
-test_err_list=[]
-learning_time=[]
-
-for i in range(10):
-    train(x_train,y_train)
-    if i%10 ==0:
-        train_err_list.append(compute_cost(x_train,y_train))
-        test_err_list.append(compute_cost(x_test,y_test))
-        learning_time.append(i)
-        print i
-
-# plt.plot(learning_time,train_err_list,'r-')
-# plt.plot(learning_time,test_err_list,'b--')
-# plt.show()
 
 
-### save model##
-# with open('./save/model.pickle','wb') as file:
-#     module=[l1.W.get_value(),l1.b.get_value()]
-#     pickle.dump(module,file)
 
-#load model
-with open('./save/model.pickle','rb') as file:
-    module=pickle.load(file)
-    l1.W.set_value(module[0])
-    l1.b.set_value(module[1])
+##  the model can learn the parameters for each neuron,but user should define the structure of network including the
+##  numbers of network level,numbers of neuron in each network level,and activation function of each leval
+if __name__ =="__main__":
+    ## load the example data
+    x_data=load_boston().data
+    ## pre_deal data
+    x_data=minmax_normalization(x_data)
+    y_data=load_boston().target[:,np.newaxis]
+
+    ## the examle data is divided into two parts:for training and for testing
+    x_train,y_train=x_data[:600],y_data[:600]
+    x_test,y_test=x_data[600:],y_data[600:]
+
+    ## explain the input and output data form
+    feats=13      #dimension of input data    feats ==>columns
+    resultNum=1   #dimension of output result
+
+    # x_data=rng.randn(N, feats)
+    # y_data=rng.randn(N,resultNum)
+
+    # now we build our network
+    MyNetWork=Neurons_Network_Struct(input_feats=feats,
+                                     out_result_num=resultNum,
+                                     x_data=x_train,y_data=y_train,
+                                     Neuronlevel=1,Neurons_Num_list=[13],
+                                     level_actfun_list=[T.tanh],
+                                     learning_rate=0.01,
+                                     train_numbers=10,
+                                     target_accuracy=0.007)
+    # train the network
+    MyNetWork.NetWrok_Train()
+
+    # save the model
+    ################
+    # reload the model
+    ################
 
 
+    #test the model with the test da
+    print("test the model")
+    res=MyNetWork.NetWork_Model_test(x_test,y_test)
+    # print(res)
+
+    #use the model to predict
+    x_pre = x_data[:5]
+    print("use the model to predict the data")
+    res=MyNetWork.NetWork_Prediction(x_pre)
+    print(res)
+
+    MyNetWork.Network_Model_Save()
+
+   # problem exist in rebuilding the nerwork
+    Another_MyNetWork = Neurons_Network_Struct(input_feats=feats,
+                                       out_result_num=resultNum,
+                                       x_data=x_train, y_data=y_train,
+                                       Neuronlevel=1, Neurons_Num_list=[13],
+                                       level_actfun_list=[T.tanh],
+                                       learning_rate=0.01,
+                                       train_numbers=0,
+                                       target_accuracy=0.007)
+
+    ##  ,need ti use this function,otherwise there is no network structure,no neural and of course no W,b
+    Another_MyNetWork.NetWrok_Train()
+    print("rebuild a nerwork")
+    Another_MyNetWork.Network_Model_Reload()
+
+    print("use the rebuild model to predict the data")
+    res = Another_MyNetWork.NetWork_Prediction(x_pre)
+    print(res)
+
+
+
+
+
+######################################   SECTION 3 : classification     ###############################
+# #
+# # def compute_accuracy(y_target,y_predict):
+# #     print (y_predict)
+# #     correct_prediction=np.equal(y_predict,y_target)
+# #     accuracy=np.sum(correct_prediction)/len(correct_prediction)
+# #     return  accuracy
+# #
+# #
+# # class Layer(object):
+# #     def __init__(self,input,in_size,out_size,activation_function=None):
+# #         #in_size rows  out_size columns
+# #         self.W=theano.shared(np.random.normal(0,1,(in_size,out_size)))
+# #         self.b=theano.shared(np.zeros((out_size,))+0.1)
+# #         self.Wx_plus_b=T.nnet.sigmoid(T.dot(input,self.W)+self.b)
+# #         self.activation_function=activation_function
+# #         if activation_function is None:
+# #             self.output=self.Wx_plus_b
+# #         else:
+# #             self.output=self.activation_function(self.Wx_plus_b)
+# #
+# # N=400     #training sample size
+# # feats=121  #number of  input variables
+# # #generate  a dataset:D=(input_values,target_class)
+# # D=(rng.randn(N,feats),rng.randint(size=N,low=0,high=2))
+# #
+# # #Declare Theano symbolic variable
+# # x=T.dmatrix('x')
+# # y=T.vector('y')
+# #
+# # l1=Layer(input=x,in_size=feats,out_size=1,activation_function=None)
+# #
+# # #initial the weights and biases
+# #
+# #
+# # # W=theano.shared(rng.randn(feats),name='w')
+# # # b=theano.shared(0.1,name="b")
+# #
+# # #Construct Theano expression graph
+# # # p_1=T.nnet.sigmoid(T.dot(x,W)+b)
+# #
+# # prediction=l1.output>0.5
+# #
+# # xnet=-y*T.log(l1.output)-(1-y)*T.log(1-l1.output)
+# # cost=xnet.mean()+0.01*(l1.W*2).sum()     #overfiding
+# # gW,gb=T.grad(cost,[l1.W,l1.b])
+# #
+# # #Compile
+# # learning_rate=0.01
+# # train=theano.function(inputs=[x,y],
+# #                       outputs=[prediction,xnet.mean()],
+# #                       updates=[(l1.W,l1.W-learning_rate*gW),(l1.b,l1.b-learning_rate*gb)]
+# #                       )
+# #
+# # predict=theano.function(inputs=[x],outputs=prediction)
+# #
+# # for i in range(5000):
+# #     pre,err=train(D[0],D[1])
+# #     if i%50 == 0:
+# #         print ("cost:",err)
+# #         print ("accuracy:",compute_accuracy(D[1],predict(D[0])))
+# #
+# # print (D[1])
+# # print (predict(D[0]))
+#
+#
