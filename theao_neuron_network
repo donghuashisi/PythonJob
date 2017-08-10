@@ -179,21 +179,33 @@ class Neurons_Network_Struct(object):
 
     def Network_Model_Save(self):
         ##when the model finishes train,save the parameters to a file
-        for i in range(self.Neuronlevel):
-            print ("Layer",i+1,"W:",self.LayerList[i].W.get_value())
-            print ("Layer",i+1,"b:", self.LayerList[i].b.get_value())
+        ### save model##
+        model_list=[]
+        with open('./model.pickle','wb') as file:
+            for i in range(self.Neuronlevel):
+                model_list.append(self.LayerList[i].W.get_value())
+                model_list.append(self.LayerList[i].b.get_value())
+            pickle.dump(model_list,file)
 
-    def Network_Model_Reload(self,ParaList):
+
+    def Network_Model_Reload(self):
         ## rebuild the model with the parametes saved
-        for i in range(self.Neuronlevel):
-            pass
+        # load model
+        with open('./model.pickle', 'rb') as file:
+            model_list = pickle.load(file)
+            print(model_list)
+            print(model_list[0])
+            print(model_list[1])
+
+            for i in range(self.Neuronlevel):
+                self.LayerList[i].W.set_value(model_list[i])
+                self.LayerList[i].b.set_value(model_list[2*i+1])
 
     def Data_MinMax_Normalization(self):
         ## input data zero homogenization and normalization
         xs_max=np.max(self.x_data,axis=0)
         xs_min=np.min(self.x_data,axis=0)
         self.x_data=(1-0)*(self.x_data-xs_min)/(xs_max-xs_min)+0
-
 
 
 
@@ -209,8 +221,8 @@ if __name__ =="__main__":
     y_data=load_boston().target[:,np.newaxis]
 
     ## the examle data is divided into two parts:for training and for testing
-    x_train,y_train=x_data[:400],y_data[:400]
-    x_test,y_test=x_data[400:],y_data[400:]
+    x_train,y_train=x_data[:600],y_data[:600]
+    x_test,y_test=x_data[600:],y_data[600:]
 
     ## explain the input and output data form
     feats=13      #dimension of input data    feats ==>columns
@@ -223,10 +235,10 @@ if __name__ =="__main__":
     MyNetWork=Neurons_Network_Struct(input_feats=feats,
                                      out_result_num=resultNum,
                                      x_data=x_train,y_data=y_train,
-                                     Neuronlevel=2,Neurons_Num_list=[50,1],
-                                     level_actfun_list=[T.tanh,None],
+                                     Neuronlevel=1,Neurons_Num_list=[13],
+                                     level_actfun_list=[T.tanh],
                                      learning_rate=0.01,
-                                     train_numbers=50,
+                                     train_numbers=10,
                                      target_accuracy=0.007)
     # train the network
     MyNetWork.NetWrok_Train()
@@ -238,11 +250,36 @@ if __name__ =="__main__":
 
 
     #test the model with the test da
+    print("test the model")
     res=MyNetWork.NetWork_Model_test(x_test,y_test)
-    print(res)
+    # print(res)
 
     #use the model to predict
-    res=MyNetWork.NetWork_Prediction(x_train)
+    x_pre = x_data[:5]
+    print("use the model to predict the data")
+    res=MyNetWork.NetWork_Prediction(x_pre)
+    print(res)
+
+    MyNetWork.Network_Model_Save()
+
+    #problem exist in rebuilding the nerwork
+    # Another_MyNetWork = Neurons_Network_Struct(input_feats=feats,
+    #                                    out_result_num=resultNum,
+    #                                    x_data=x_train, y_data=y_train,
+    #                                    Neuronlevel=1, Neurons_Num_list=[13],
+    #                                    level_actfun_list=[T.tanh],
+    #                                    learning_rate=0.01,
+    #                                    train_numbers=10,
+    #                                    target_accuracy=0.007)
+    #
+    # print("rebuild a nerwork")
+    # Another_MyNetWork.Network_Model_Reload()
+    #
+    # print("use the rebuild model to predict the data")
+    # res = Another_MyNetWork.NetWork_Prediction(x_pre)
+    # print(res)
+
+
 
 
 
