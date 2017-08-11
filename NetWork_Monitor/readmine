@@ -1,0 +1,12 @@
+we need to build a neurons network to automaticlly monitor the state of network 
+
+problem 1 : is it a  Supervised learning  or  Nosupervised learning?
+
+problem 2 : does the input parameters including detailed information such as details of each protocol even package port and ip address?
+             or just some general parameters such packet rate,max packet rate,min packet rate QFP cpu load ......
+             
+             
+             But thinking about the original intention of neural network design,it is a intelligent system to learn just like human,regardless of what or which situation to learn.
+             So the neruns network is used to learning everything by itself,regardless of the background.
+             The only prerequisite is that the data we provide for the neruns network should  hide the logical relation of something or thing in the real world
+             I think it is the redundancy between the data.
